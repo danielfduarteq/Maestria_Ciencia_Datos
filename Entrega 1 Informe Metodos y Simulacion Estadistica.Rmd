@@ -326,3 +326,6 @@ Este informe permite definir de manera clara y estructura cual debe ser la estra
 
 ## Anexos
 
+La información de este analisis se encuentra en el siguiente repositorio:
+
+https://github.com/danielfduarteq/Maestria_Ciencia_Datos/blob/main/Entrega%201%20Informe%20Metodos%20y%20Simulacion%20Estadistica.Rmd
