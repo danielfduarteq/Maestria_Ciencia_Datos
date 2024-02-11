@@ -1,0 +1,328 @@
+---
+title: "Informe estadistico: Análisis del mercado inmobiliario en Cali "
+author: "Daniel Felipe Duarte Quintero"
+date: "2024-02-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduccion
+
+El sector de la finca raíz en especial la venta de propiedades como casas y apartamentos en la ciudad de Cali, ha presentado un notable crecimiento en los últimos años, impulsado por diversos factores como el aumento de la población, la inversión extranjera que ha llegado a la ciudad y el desarrollo de nuevos proyectos residenciales por parte de diversas empresas privadas o personas naturales. En este contexto, la empresa B&C (Bines y Casas) se ha consolidado como una agencia líder en bienes raíces en la región, con una trayectoria de 10 años en el mercado desde su fundación por la Sra. Sandra Milena.
+
+Con el objetivo de mantener su posición competitiva y tomar decisiones informadas, B&C ha recopilado una amplia cantidad de datos sobre el mercado inmobiliario de Cali, incluyendo información detallada sobre precios por metro cuadrado, ubicación, estrato social, numero de habitaciones, numero de baños y numero de parqueaderos entre otros. Este conjunto de datos ofrece una oportunidad para realizar un análisis estadístico exhaustivo que aporte valor agregado a la toma de decisiones de la compañia sobre las tendencias y patrones clave en el mercado de bienes raíces de la ciudad para asi realizar un mejor ejercicio de ventas.
+
+## Objetivos
+El presente informe tiene como objetivo principal proporcionar a la empresa B&C un análisis descriptivo detallado de los datos recopilados, con el fin de detectar tendencias y patrones relevantes en el mercado inmobiliario de Cali.  Los objetivos específicos del informe son los siguientes:
+
+1. Analizar la distribución y variación de los precios de las viviendas en diferentes zonas de Cali, con el objetivo de identificar áreas de alta demanda y potencial de crecimiento.
+
+2. Identificar y describir los tipos de viviendas más ofertados en el mercado de Cali, así como las características más relevantes de estas propiedades, tales como tamaño, número de habitaciones, numero de baños, estrato social y ubicación.
+
+3. Detallar información que permita tomar decisiones sobre la definición del nicho de mercado de la empresa B&C, el desarrollo de estrategias de marketing efectivas, la fijación de precios de venta competitivos y la oferta de servicios personalizados que generan la satisfacción de las necesidades y preferencias de sus clientes.
+
+## Metodos
+Para empezar con el analisis estadistico se emplearán tecnicas de revisión de los datos obtenidos por la compañia para identificar posibles patrones, desviaciones, datos faltantes y decidir cual sera la mejor opcion para generar la depuración de la información.
+
+El analisis empieza con una revisión preliminar de las variables que componen el dataset, inicialmente se puede identificar que en las variables "Piso" y "Numero de parqueaderos" se presenta gran cantidad de datos faltantes, por lo cual se definió imputar estas dos variables.
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(paqueteMETODOS)
+library(naniar)
+library(VIM)
+library(stringr)
+library(leaflet)
+data(vivienda_faltantes)
+names(vivienda_faltantes) <- c("Id","Zona","Piso","Estrato","Precio x metro cuadrado","Area construida", "Numero de parqueaderos", "Baños", "Habitaciones","Tipo","Barrio", "Longitud","Latitud")
+psych::describe((vivienda_faltantes))
+```
+Detalle de NA's (datos faltantes) por variable, se identifica que aproximadamente un 30% de los datos no tienen información en la variable "Piso" y un 20% en la variable "Numero de parqueaderos".
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+VIM::aggr(vivienda_faltantes, cex.axis = 0.4, cex.lab= 0.4)  #Graficar proporcion de NA por variable y combinaciones de faltantes
+```
+```{r message=FALSE, warning=FALSE, include=FALSE}
+#REEMPLAZO DE NA EN CADA VARIABLE
+
+#Se identifica que faltan 2.641 datos en la variable PISO
+#Se procede a la descripcion de la variable piso, en el cual hay 5689 registros validos de una muestra de 8327 registros, es decir un 68,3% de los datos.
+table(vivienda_faltantes$Piso,vivienda_faltantes$`Numero de parqueaderos`)
+summarytools::descr(vivienda_faltantes$Piso)
+boxplot(vivienda_faltantes$Piso, 
+        main = "Variable PISO - BOXPLOT",   # Título del gráfico
+        xlab = "Variable X",           # Etiqueta del eje x
+        ylab = "Variable Y",           # Etiqueta del eje y
+        col = "skyblue",               # Color de las cajas
+        border = "black",              # Color del borde de las cajas
+        horizontal = FALSE            # Horizontalidad de las cajas
+)
+#Despues de medir la media truncada por el 68.6% de los datos, se evidencia que para la media de piso donde estan estas propiedades es el PISO 3, que es exactamente igual a la MEDIANA.
+
+media_truncada_piso_vivienda <- round(mean(vivienda_faltantes$Piso,trim=0.317),0)
+#Se procede a reemplazar los NA de la variable PISO por la media truncada para normalizar la base de datos
+vivienda_faltantes$Piso[is.na(vivienda_faltantes$Piso)] <- media_truncada_piso_vivienda      #Arreglo de variable piso por la media truncada
+VIM::aggr(vivienda_faltantes, cex.axis = 1, cex.lab= 1)
+
+
+#Se identifica que faltan 1.606 en la variable PARQUEA
+#Se procede a la descripcion de la variable piso, en el cual hay 6724 registros validos de una muestra de 8327 registros, es decir un 80,72% de los datos.
+
+summarytools::descr(vivienda_faltantes)
+boxplot(vivienda_faltantes$`Numero de parqueaderos`, 
+        main = "Variable PARQUEADERO- BOXPLOT",   # Título del gráfico
+        xlab = "Variable X",           # Etiqueta del eje x
+        ylab = "Variable Y",           # Etiqueta del eje y
+        col = "skyblue",               # Color de las cajas
+        border = "black",              # Color del borde de las cajas
+        horizontal = FALSE            # Horizontalidad de las cajas
+)
+#Para este caso se reemplazará por la mediana, el Q3 es exactamente 2 parqueaderos, la distribición de los datos (boxplot) representa que el 75% de las propiedades tienen 2 parqueaderos o incluso 1.
+mediana_parqueadero_vivienda <- median(vivienda_faltantes$`Numero de parqueaderos`)
+#Se procede a reemplazar los NA de la variable PARQUEA por la mediana para normalizar la base de datos
+vivienda_faltantes$`Numero de parqueaderos`[is.na(vivienda_faltantes$`Numero de parqueaderos`)] <- mediana_parqueadero_vivienda      #Arreglo de variable parqueadero por la mediana
+VIM::aggr(vivienda_faltantes, cex.axis = 0.4, cex.lab= 0.4)
+
+#Arreglar los barrios (normalizar) (437 barrios inicialmente)
+vivienda_faltantes$Barrio=str_to_lower(vivienda_faltantes$Barrio)   #Arreglo de barrios, primera en mayuscula resto en minuscula
+vivienda_faltantes$Barrio <- chartr("áéíóú", "aeiou", vivienda_faltantes$Barrio) #Arreglo de barrios, quitar tildes
+vivienda_faltantes$Barrio <- iconv(vivienda_faltantes$Barrio, from = "UTF-8", to = "latin1", sub = "")  #Convertir a UTF-8 los barrios, para quitar caracteres especiales
+vivienda_faltantes$Barrio <- chartr("©", "e", vivienda_faltantes$Barrio) #Arreglo de barrios, cambiar caracter especial por e
+vivienda_faltantes$Barrio <- gsub("valle de lili","valle del lili",vivienda_faltantes$Barrio)
+vivienda_faltantes$Barrio <- gsub("el ingenio","ingenio",vivienda_faltantes$Barrio)
+vivienda_faltantes$Barrio <- gsub("ingenio iii","ingenio",vivienda_faltantes$Barrio)
+vivienda_faltantes$Barrio <- gsub("ingenio ii","ingenio",vivienda_faltantes$Barrio)
+vivienda_faltantes$Barrio <- gsub("ingenio i","ingenio",vivienda_faltantes$Barrio)
+vivienda_faltantes$Barrio <- gsub("ingenio 3","ingenio",vivienda_faltantes$Barrio)
+vivienda_faltantes$Barrio <- gsub("ciudad jardin pance","ciudad jardin",vivienda_faltantes$Barrio)
+vivienda_faltantes$Barrio <- gsub("juanamb","juanambu",vivienda_faltantes$Barrio)
+vivienda_faltantes$Barrio <- gsub("la rivera ii","la rivera",vivienda_faltantes$Barrio)
+vivienda_faltantes$Barrio <- gsub("la rivera i","la rivera",vivienda_faltantes$Barrio)
+vivienda_faltantes$Tipo <- gsub("casa","Casa",vivienda_faltantes$Tipo)
+vivienda_faltantes$Tipo <- gsub("CASA","Casa",vivienda_faltantes$Tipo)
+vivienda_faltantes$Tipo <- gsub("apto","Apartamento",vivienda_faltantes$Tipo)
+vivienda_faltantes$Tipo <- gsub("APARTAMENTO","Apartamento",vivienda_faltantes$Tipo)
+
+
+length(unique(vivienda_faltantes$Barrio))   #Numero de barrios (valores unicos) en la variable "BARRIO" 376 barrios final
+
+length(unique(vivienda_faltantes$Tipo))  
+#Arreglar las coordenadas (normalizar) (unas en miles otras en cientos)
+vivienda_faltantes$Longitud<- ifelse(vivienda_faltantes$Longitud < -100, vivienda_faltantes$Longitud / 1000, vivienda_faltantes$Longitud)
+vivienda_faltantes$Latitud<- ifelse(vivienda_faltantes$Latitud > 100, vivienda_faltantes$Latitud / 1000, vivienda_faltantes$Latitud)
+
+plot(vivienda_faltantes$Latitud,vivienda_faltantes$Longitud,
+     main = "Gráfico de dispersión",  # Título principal
+     xlab = "Eje X",                  # Etiqueta del eje x
+     ylab = "Eje Y",                  # Etiqueta del eje y
+     col = rainbow(24),                    # Color de los puntos
+     pch = 16                         # Tipo de punto (círculos sólidos)
+)
+
+
+```
+Despues se realizar la imputación de las dos variables "Piso" y "Numero de parqueaderos" con el objetivo de completar la información para generar un analisis mas preciso, se realiza la limpieza de las variables "Tipo", "Barrio", "Latitud", "Longitud" normalizando el dataset por completo.
+
+El detalle de lo anterior esta descrito de la siguiente manera.
+
+1. Imputación variable Piso: Se imputa mediante el reemplazo de la media "truncada" por el 68% de los datos que son validos generando que los datos NA'S(Faltantes) se reemplacen por 3er piso.
+
+2. Imputación variable Numero de parqueaderos: Se imputa mediante el reemplazo de la mediana por lo menos el 75% de las propiedades tienen 2 o mas parqueaderos, los faltantes se reemplazan por 2 parqueaderos.
+
+3. La limpieza de la información en las variables cualitativas como Tipo y Barrio se hace mediante arreglos de texto como gsub que reemplaza sinonimos y Chartr que reemplaza las tildes y caracteres especiales.
+
+4. Para el caso de latitud y longitud al presentar ciertas cifras en miles y otras en cientos, se realiza un arreglo mediante un condicional que permita que las coordenadas mayores a 100 para este caso queden expresadas en cientos.
+
+La información normalizada queda de la siguiente manera: se detalla que no existen datos faltantes para ninguna de las variables y por lo tanto se puede iniciar con los respectivos analisis estadisticos y graficos para ayudar a la toma de decisiones.
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+vivienda_faltantes_data_final <- vivienda_faltantes [complete.cases(vivienda_faltantes), ]
+VIM::aggr(vivienda_faltantes_data_final, cex.axis = 0.4, cex.lab= 0.4)
+
+```
+
+## Resultados
+1. Precio de las viviendas en diferentes zonas de Cali.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+boxplot(vivienda_faltantes_data_final$`Precio x metro cuadrado`~vivienda_faltantes_data_final$Zona, 
+        main = "Distribución de precio m2 por zona en Cali",   # Título del gráfico
+        xlab = "Zonas de la ciudad de Cali",           # Etiqueta del eje x
+        ylab = "Precio m2",           # Etiqueta del eje y
+        col = rainbow(15),               # Color de las cajas
+        border = "black",              # Color del borde de las cajas
+        horizontal = FALSE            # Horizontalidad de las cajas
+)
+```
+
+Se observa que el precio promedio por metro cuadrado en general es mas alto en la Zona Oeste y el mas bajo es en la Zona Oriente, tambien se puede evidenciar que donde se presenta un rango mayor de precios es en la Zona Oeste y a su vez el rango es mas estrecho en la Zona Oriente, donde se presentan mas datos atipicos (precios por fuera de rango) es en Zona Norte y en Zona Sur.
+
+2. Tipo de vivienda mas ofertada en Cali.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+Tipo_Vivienda <- table(vivienda_faltantes_data_final$Tipo)
+Proporcion_Tipo_Vivienda <- prop.table(Tipo_Vivienda) * 100
+etiquetas <- c("Apartamento", "Casa")
+
+etiquetas_con_porcentaje <- paste(etiquetas, round(Proporcion_Tipo_Vivienda), "%", sep=" ")
+
+pie(Proporcion_Tipo_Vivienda, labels = etiquetas_con_porcentaje,
+    col = rainbow(length(etiquetas)),
+    main = "Tipo de vivienda mas ofertada en Cali")
+
+```
+Se observa que aproximadamente un 61% de las propiedades analizadas en este informe pertenecen al tipo "Apartamento" mientras que el restante 39% pertenecen al tipo "Casa"
+
+3. Caracteristicas mas relevantes de la oferta de vivienda en Cali.
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+par(mfrow = c(2, 2) )
+
+hist(vivienda_faltantes_data_final$Habitaciones, 
+     breaks = 10,            # Número de contenedores/bins
+     col = rainbow(15),       # Color de las barras
+     border = "black",      # Color del borde de las barras
+     main = "Numero de habitaciones por vivienda",   # Título principal
+     xlab = "Habitaciones",      # Etiqueta del eje x
+     ylab = "Cantidad"    # Etiqueta del eje y
+)
+
+hist(vivienda_faltantes_data_final$Baños, 
+     breaks = 10,            # Número de contenedores/bins
+     col = rainbow(15),       # Color de las barras
+     border = "black",      # Color del borde de las barras
+     main = "Numero de baños por vivienda",   # Título principal
+     xlab = "Baños",      # Etiqueta del eje x
+     ylab = "Cantidad"    # Etiqueta del eje y
+)
+
+barplot(table(vivienda_faltantes_data_final$Estrato), 
+        breaks = 10,            # Número de contenedores/bins
+        col = rainbow(15),       # Color de las barras
+        border = "black",      # Color del borde de las barras
+        main = "Viviendas por estrato",   # Título principal
+        xlab = "Estrato",      # Etiqueta del eje x
+        ylab = "Cantidad"    # Etiqueta del eje y
+)
+barplot(table(vivienda_faltantes_data_final$Zona), 
+        breaks = 10,            # Número de contenedores/bins
+        col = rainbow(15),       # Color de las barras
+        border = "black",      # Color del borde de las barras
+        main = "Viviendas por Zona",   # Título principal
+        xlab = "Zona",      # Etiqueta del eje x
+        ylab = "Cantidad"    # Etiqueta del eje y
+)
+
+```
+
+Se observa que la gran mayoria de propiedades tienen 3 habitaciones y 2 baños, respecto a los estratos y zonas la mayoria de propiedades se encuentran ubicadas en el estrato 5 y en la Zona Sur de la Ciudad.
+
+4. Analisis estadistico de las caracteristicas de la oferta de vivienda en Cali.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+boxplot(vivienda_faltantes_data_final$Piso~vivienda_faltantes_data_final$Estrato, 
+        main = "Distribucion de Ubicacion (Piso) por Estrato en Cali ",   # Título del gráfico
+        xlab = "Estrato",           # Etiqueta del eje x
+        ylab = "Piso",           # Etiqueta del eje y
+        col = rainbow(15),               # Color de las cajas
+        border = "black",              # Color del borde de las cajas
+        horizontal = FALSE            # Horizontalidad de las cajas
+)
+```
+
+Se evidencia que la gran mayoria de propiedades estan en el 3er piso sin importar cual sea el estrato socioeconomico asignado, teniendo datos atipicos en todos los estratos principalmente por encima del 7mo piso.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+plot(vivienda_faltantes_data_final$`Area construida`, vivienda_faltantes_data_final$`Precio x metro cuadrado`, 
+     main = "Relacion Area/Precio x Metro Cuadrado",  # Título principal
+     xlab = "Area Construida",                  # Etiqueta del eje x
+     ylab = "Precio x m2",                  # Etiqueta del eje y
+     col = rainbow(15),                    # Color de los puntos
+     pch = 16                         # Tipo de punto (círculos sólidos)
+)
+
+```
+
+Se evidencia que la gran mayoria de propiedades cumplen las siguientes caracteristicas:
+
+1. Menor a 1000 m2 construidos
+
+2. Menor a 1.500 el precio x m2
+
+Se detectan atipicos como que una pequeña parte de las propiedades tienen un valor igual o mayor a 1.500 el precio x m2 y tienen un area construida mayor a 1.000 M2
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+boxplot(vivienda_faltantes_data_final$Habitaciones~vivienda_faltantes_data_final$Baños, 
+        main = "Densidad Habitaciones vs Baños ",   # Título del gráfico
+        xlab = "Habitaciones",           # Etiqueta del eje x
+        ylab = "Baños",           # Etiqueta del eje y
+        col = rainbow(15),               # Color de las cajas
+        border = "black",              # Color del borde de las cajas
+        horizontal = FALSE            # Horizontalidad de las cajas
+)
+```
+
+Se describe la densidad de datos presentada entre el Numero de Habitaciones vs Numero de Baños en cada propiedad.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+hist(vivienda_faltantes_data_final$`Numero de parqueaderos`, 
+     breaks = 10,            # Número de contenedores/bins
+     col = rainbow(15),       # Color de las barras
+     border = "black",      # Color del borde de las barras
+     main = "Numero de parqueaderos por vivienda",   # Título principal
+     xlab = "Parqueaderos",      # Etiqueta del eje x
+     ylab = "Cantidad"    # Etiqueta del eje y
+)
+
+```
+
+La información permite afirmar que la gran mayoria de propiedades tienen solo 1 parqueadero, solo en casos puntuales tienen entre 2 y 4 parqueaderos, existen datos atipicos donde las propiedades tienen entre 4 y 10 parqueaderos.
+
+
+5. Mapa descriptivo e interactivo de la oferta de vivienda en Cali.
+
+Para este mapa se toma la muestra de 100 propiedades con el objetivo de poder visualizar de forma grafica la ubicación geoespacial de las propiedades evaluadas para este informe.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(leaflet)
+#Muestrear para sacar un maximo de 1000 puntos en el MAPA.
+muestra_mapa_vivienda_cali <- vivienda_faltantes_data_final%>% 
+  sample_n(100)
+
+Mapa_Vivienda_Cali <- leaflet(data = vivienda_faltantes_data_final) %>%
+  addTiles()  # Agregar el fondo de mapa base
+
+# Agregar marcadores para cada punto con información adicional
+Mapa_Vivienda_Cali <- Mapa_Vivienda_Cali %>%
+  addCircleMarkers(lng = muestra_mapa_vivienda_cali$Longitud, lat = muestra_mapa_vivienda_cali$Latitud,
+                   radius = 0.001,  # Tamaño del marcador
+                   color = rainbow(24), fillOpacity = 0.001,
+                   popup = ~paste("Precio/m2: ", vivienda_faltantes_data_final$`Precio x metro cuadrado`, "<br>",
+                                  "Estrato: ", vivienda_faltantes_data_final$Estrato, "<br>",
+                                  "Zona: ", vivienda_faltantes_data_final$Zona, "<br>",
+                                  "Barrio: ", vivienda_faltantes_data_final$Barrio))
+Mapa_Vivienda_Cali
+
+```
+
+## Discusión
+
+La empresa B&C debe presentar oferta sectorizada para las propiedades que pretende vender en la ciudad de Cali ya que el estudio refleja diferencias sustanciales en el precio promedio por metro cuadrado en diferentes zonas de la ciudad, como punto de referencia tendrá conocimiento de que los apartamentos son las propiedades mas vendidas en Cali según este estudio teniendo como principales características dos habitaciones, dos baños y un parqueadero.
+Basado en este estudio debería impulsar fuertemente su plan de ventas en la Zona Sur, al ser la zona con mayor cantidad de viviendas y donde puede tener mayor porcentaje de ventas en próximos proyectos inmobiliarios.
+
+## Conclusiones
+
+Se debe tener en cuenta una segmentación del mercado debido a que el análisis detallado de los precios por metro cuadrado en diferentes zonas de Cali resalta la importancia de segmentar la oferta para la empresa B&C. Este enfoque permitirá adaptar estrategias de precios y marketing específicas para cada área, maximizando así el potencial de ventas en cada segmento.
+
+Las preferencias de los clientes indican una mayor preferencia por los apartamentos por lo cual la compañía deberá ajustar su oferta a este tipo de propiedad para asi garantizar que sus inmuebles sean realmente lo que demanda el mercado.
+
+Las características principales a considerar esta en el numero de habitaciones, baños y parqueaderos que sin importar el estrato socioeconómico o el sector se mantienen, esta debe ser su oferta base para adelantar próximos proyectos inmobiliarios.
+
+La empresa debe explotar la información obtenida en este informe sobre la expansión y el creciente desarrollo de la zona sur en la ciudad de Cali, de esta manera asegura su vigencia en el mercado frente a sus otros competidores.
+
+Este informe permite definir de manera clara y estructura cual debe ser la estrategia comercial de la compañia B&C respecto a proximas inversiones en proyectos inmobiliarios que le permitan mantenerse vigente en el mercado y estar a la vanguardia.
+
+## Anexos
+
