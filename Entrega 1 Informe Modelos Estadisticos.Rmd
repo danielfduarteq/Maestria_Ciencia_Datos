@@ -1,0 +1,571 @@
+---
+title: "Evaluación de la oferta inmobiliaria urbana "
+author: "Daniel Felipe Duarte Quintero"
+date: "2024-08-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Modelos Estadisticos para la Toma de Decisiones.
+
+## Librerias
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+library(paqueteMODELOS)
+library(naniar)
+library(VIM)
+library(stringr)
+library(FactoMineR)
+library(factoextra)
+library(ggplot2)
+library(mice)
+library(corrplot)
+library(dplyr)
+library(tidyverse)
+library(cluster)
+library(fuzzyjoin)
+library(leaflet)
+library(RColorBrewer)
+data("vivienda")
+```
+
+## 1. Introduccion
+
+En el competitivo mercado inmobiliario urbano, la toma de decisiones informadas es esencial para garantizar el éxito y la sostenibilidad de las empresas. Una empresa inmobiliaria líder en la ciudad busca mejorar su comprensión del mercado de viviendas mediante el análisis de su base de datos, que contiene información detallada sobre diversas propiedades residenciales. El análisis de estos datos permitirá a la empresa identificar patrones, relaciones y segmentaciones relevantes, optimizando así sus estrategias de compra, venta y valoración de propiedades.
+
+
+## 2. Objetivos
+1. Utilizar técnicas estadísticas avanzadas para examinar la oferta de viviendas, con el fin de identificar características clave que influyen en la variación de precios y la disponibilidad de propiedades en diferentes zonas de la ciudad.
+2. Reducir la dimensionalidad del conjunto de datos para visualizar y comprender la estructura de las variables, enfocándose en aquellos factores que más impactan en el mercado inmobiliario.
+3. Agrupar las propiedades en segmentos homogéneos para entender mejor las dinámicas de oferta en diferentes partes de la ciudad y en diversos estratos socioeconómicos.
+4. Examinar la relación entre las variables categóricas, como tipo de vivienda, zona y barrio, para identificar patrones que puedan influir en la toma de decisiones estratégicas.
+5. Presentar los hallazgos mediante gráficos, mapas y otras herramientas visuales, facilitando así la comprensión y la toma de decisiones por parte de la dirección de la empresa.
+
+
+## 3. Analisis exploratorio de datos
+Para empezar con el analisis estadistico se emplearán tecnicas de revisión de los datos obtenidos por la compañia para identificar posibles patrones, desviaciones, datos faltantes y decidir cual sera la mejor opcion para generar la depuración de la información.
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+summary(vivienda)
+```
+Se cambian los nombres de los encabezados de la tabla.
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+names(vivienda) <- c("Id","Zona","Piso","Estrato","Precio x metro cuadrado","Area construida", "Numero de parqueaderos", "Banos", "Habitaciones","Tipo","Barrio", "Longitud","Latitud")
+```
+Se identifica que la variable Piso esta siendo identificada como de tipo caracter(cualitativo) cuando realmente es cuantitativo y se procede a transformar la variable a numerica.
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+vivienda$Piso <- as.numeric(vivienda$Piso)
+```
+Se calcula cuantos NA tiene cada columna para definir que columnas se deben imputar o normalizar.
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+datosfaltantes_vivienda <- colSums(is.na(vivienda)) %>%
+  as.data.frame() 
+datosfaltantes_vivienda
+```
+Se grafica cantidad de NA por variable.
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+gg_miss_var(vivienda) 
+VIM::aggr(vivienda, cex.axis = 0.4, cex.lab= 0.4)  #Graficar proporcion de NA por variable y combinaciones de faltantes
+```
+
+El analisis empieza con una revisión preliminar de las variables que componen el dataset, inicialmente se procede a cambiar los nombres de las columnas para una mayor organización y comprensión de la información, tambien se puede identificar que en las variables "Piso" y "Numero de parqueaderos" se presenta gran cantidad de datos faltantes, por lo cual se decide imputar estas dos variables, eliminarlas es una opción pero perderiamos alrededor del 30% de la información de la base de datos en cuanto a numero de registros por lo cual la imputación es la acción seleccionada.
+
+## 4. Imputación
+Se identifica que faltan 2.638 datos en la variable Piso.
+Se procede a la descripcion de la variable piso, en el cual hay 5684 registros validos de una muestra de 8322 registros, es decir un 68,3% de los datos.
+```{r echo=FALSE}
+
+summarytools::descr(vivienda$Piso)
+boxplot(vivienda$Piso, 
+        main = "Variable Piso",   # Título del gráfico
+        xlab = "Numero de inmuebles",           # Etiqueta del eje x
+        ylab = "Piso",           # Etiqueta del eje y
+        col = "skyblue",               # Color de las cajas
+        border = "black",              # Color del borde de las cajas
+        horizontal = FALSE            # Horizontalidad de las cajas
+)
+```
+
+
+Despues de medir la media truncada por el 68.6% de los datos, se evidencia que para la media de piso donde estan estas propiedades es el PISO 3, que es exactamente igual a la MEDIANA.
+
+
+```{r}
+media_truncada_piso_vivienda <- round(mean(vivienda$Piso,trim=0.317),0)
+#Se procede a reemplazar los NA de la variable PISO por la media truncada para normalizar la base de datos
+vivienda$Piso[is.na(vivienda$Piso)] <- media_truncada_piso_vivienda      #Arreglo de variable piso por la media truncada
+VIM::aggr(vivienda, cex.axis = 0.4, cex.lab= 0.4)
+
+```
+
+Se identifica que faltan 1.605 en la variable Numero de Parqueaderos
+
+Se procede a la descripcion de la variable Numero de parqueaderos, en el cual hay 6717 registros validos de una muestra de 8322 registros, es decir un 80,71% de los datos.
+
+
+```{r echo=FALSE}
+summarytools::descr(vivienda$`Numero de parqueaderos`)
+boxplot(vivienda$`Numero de parqueaderos`, 
+        main = "Variable Numero de parqueaderos",   # Título del gráfico
+        xlab = "Numero de inmuebles",           # Etiqueta del eje x
+        ylab = "Numero de parqueaderos",           # Etiqueta del eje y
+        col = "skyblue",               # Color de las cajas
+        border = "black",              # Color del borde de las cajas
+        horizontal = FALSE            # Horizontalidad de las cajas
+)
+```
+
+
+Para este caso se reemplazará por la mediana, el Q3 es exactamente 2 parqueaderos, la distribición de los datos (boxplot) representa que el 75% de las propiedades tienen 2 parqueaderos o incluso 1.
+
+
+```{r}
+mediana_parqueadero_vivienda <- median(vivienda$`Numero de parqueaderos`)
+```
+
+Se procede a reemplazar los NA de la variable numero de parqueaderos por la mediana para normalizar la base de datos.
+
+```{r}
+vivienda$`Numero de parqueaderos`[is.na(vivienda$`Numero de parqueaderos`)] <- mediana_parqueadero_vivienda      #Arreglo de variable parqueadero por la mediana
+```
+```{r}
+VIM::aggr(vivienda, cex.axis = 1, cex.lab= 1)
+```
+
+Teniendo imputadas las variables Piso y Numero de parqueaderos, procedemos con la imputacion de los 3 NA's identificados inicialmente en todos los campos.
+
+```{r}
+vivienda_data_final <- vivienda [complete.cases(vivienda), ]
+VIM::aggr(vivienda_data_final, cex.axis = 0.4, cex.lab= 0.4)
+```
+
+Se visualiza que la base de datos esta completa, por lo tanto podemos proceder con los siguientes analisis.
+
+
+## 5. Caracteristicas principales de la vivienda
+```{r}
+summary(vivienda_data_final)
+```
+Se calcula el precio promedio por metro cuadrado por zona.
+
+
+```{r}
+precio_promedio_por_zona <- aggregate(`Precio x metro cuadrado` ~ Zona, data = vivienda_data_final, FUN = mean)
+```
+Se procede a graficar el precio promedio por metro cuadrado por zona en la ciudad.
+
+
+```{r echo=FALSE}
+ggplot(precio_promedio_por_zona, aes(x = reorder(Zona, `Precio x metro cuadrado`), y = `Precio x metro cuadrado`, fill = `Precio x metro cuadrado`)) +
+  geom_bar(stat = "identity", color = "black") +
+  coord_flip() + # Gira el gráfico para que las zonas sean más legibles
+  scale_fill_gradient(low = "#66B2FF", high = "#FF6666", name = "Precio m2") +
+  labs(title = "Precio promedio por metro cuadrado por zona",
+       x = "Zona",
+       y = "Precio promedio por metro cuadrado") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+Se identifica que la Zona con mayor precio por m2 es la Zona Oeste seguido de la Zona Sur, la Zona Oriente es la que presente las propiedades con menor precio por m2.
+
+
+
+Se calcula la proporción del tipo de inmueble ofertado.
+
+
+```{r echo=FALSE}
+Tipo_Vivienda <- table(vivienda_data_final$Tipo)
+Proporcion_Tipo_Vivienda <- prop.table(Tipo_Vivienda) * 100
+
+df_tipo_vivienda <- as.data.frame(Proporcion_Tipo_Vivienda)
+colnames(df_tipo_vivienda) <- c("Tipo", "Proporcion")
+
+# Gráfico
+ggplot(df_tipo_vivienda, aes(x = "", y = Proporcion, fill = Tipo)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +
+  coord_polar("y", start = 0) +
+  theme_void() + # Elimina fondos y ejes
+  theme(legend.title = element_blank()) +
+  geom_text(aes(label = paste0(round(Proporcion), "%")), 
+            position = position_stack(vjust = 0.5), 
+            color = "white", size = 5) +  # Asegúrate de que este "+" está presente
+  scale_fill_manual(values = c("#FF6666", "#66B2FF")) +
+  labs(title = "Distribución de Tipos de Vivienda Ofertada en la Ciudad")
+```
+
+
+Se puede concluir que en una relacion de 6 de cada 10 propiedades son Apartamentos en el listado de propiedades.
+
+
+```{r echo=FALSE}
+ggplot(vivienda_data_final, aes(x = `Area construida`, y = `Precio x metro cuadrado`)) +
+  geom_point(aes(color = Zona), alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE, color = "#66B2FF") +
+  labs(title = "Relación entre Área Construida y Precio por Metro Cuadrado",
+       x = "Área Construida (m²)",
+       y = "Precio por Metro Cuadrado",
+       color = "Zona") +
+  theme_minimal()
+```
+ 
+ 
+Se evidencia que existe una correlación positiva entre el area construida y el precio por m2.
+    
+  
+
+## 6. Analisis de Componentes Principales
+
+Se verifica que no existan datos faltantes y se escala(estandariza) las columnas seleccionadas
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+md.pattern(vivienda_data_final)
+vivienda_data_finalZ= scale(vivienda_data_final[,4:9])
+```
+
+Se procede a hacer el PCA y se genera la grafica.
+
+```{r echo=FALSE}
+prcomp(vivienda_data_finalZ)
+res.pca <- prcomp(vivienda_data_finalZ)
+fviz_eig(res.pca, addlabels = TRUE)
+```
+
+Se hace el grafico de PCA.
+
+```{r echo=FALSE}
+fviz_pca_var(res.pca,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#FF7F00",  "#034D94"),
+             repel = TRUE     # Avoid text overlapping
+) 
+```
+
+Sentido de los ejes (Se escogen 4 casos extremos de la base de datos)
+
+```{r echo=FALSE}
+casos1 <- rbind(res.pca$x[275,1:2],res.pca$x[831,1:2]) # CP1
+rownames(casos1) = c("275","831")
+casos1 <- as.data.frame(casos1)
+
+casos2 <- rbind(res.pca$x[2924,1:2], res.pca$x[2642,1:2]) # CP2
+rownames(casos2) = c("2924","2642")
+casos2 <- as.data.frame(casos2)
+
+
+fviz_pca_ind(res.pca, col.ind = "#DEDEDE", gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07")) +
+  geom_point(data = casos1, aes(x = PC1, y = PC2), color = "red", size = 3) +
+  geom_text(data = casos1, aes(x = PC1, y = PC2, label = rownames(casos1)), color = "red", vjust = -1) +
+  geom_point(data = casos2, aes(x = PC1, y = PC2), color = "blue", size = 3) +
+  geom_text(data = casos2, aes(x = PC1, y = PC2, label = rownames(casos2)), color = "blue", vjust = -1)
+
+datos<- rbind(vivienda_data_final[275,], # ok
+              vivienda_data_final[831,],
+              vivienda_data_final[2924,],
+              vivienda_data_final[2642,])
+
+datos <- as.data.frame(datos)
+rownames(datos) = c("Vivienda 275","Vivienda 831","Vivienda 2924","Vivienda 2642")
+datos
+
+```
+El PC1 (Primer Componente Principal) es una combinación de todas las variables con pesos positivos, donde Precio por metro cuadrado, Área construida, Número de parqueaderos, y Baños tienen los coeficientes más altos. Esto sugiere que estas variables son las que más contribuyen a la varianza total en el dataset. El PC1 podría estar capturando una medida general de tamaño y valor de la propiedad.
+
+El PC2 muestra una alta contribución de Estrato y Habitaciones, pero con un signo negativo en Habitaciones. Esto indica que estas variables tienen una relación inversa en este componente. El PC2 podría estar relacionado con aspectos socioeconómicos o características específicas de las viviendas.
+
+
+
+Se genera el biplot del PCA para añadir una dimension de variable categorica al grafico en este caso Estrato.
+
+```{r echo=FALSE}
+fviz_pca_biplot(res.pca, 
+                repel = FALSE,
+                habillage = vivienda_data_final$Estrato,
+                col.var = "#034A94", # Variables color
+                col.ind = c("#DEDEDE", "#034A94")  # Individuals color
+)
+
+```
+
+El análisis sugiere que Estrato está fuertemente asociado con varias variables como Precio por metro cuadrado y Área construida, lo que no es sorprendente dado que los estratos socioeconómicos más altos suelen estar vinculados a propiedades más grandes y costosas.
+
+
+## 7. Analisis de Conglomerados
+
+Se realiza cambio de nombre para simplificar grafica.
+
+```{r echo=FALSE}
+colnames(vivienda_data_finalZ) <- c("Estrato", "Precio_m2", "Area", "Parqueaderos", "Banos", "Habitaciones")
+```
+
+Se calcula y grafica correlaciones para visualizar que variables influyen una sobre la otra.
+
+```{r echo=FALSE}
+cor(vivienda_data_finalZ)
+# Graficar con corrplot ajustando el tamaño del texto
+corrplot::corrplot.mixed(
+  cor(vivienda_data_finalZ), 
+  lower = "ellipse", 
+  upper = "number", 
+  order = "hclust", 
+  tl.cex = 0.5,   # Ajusta el tamaño del texto de las etiquetas
+  tl.srt = 45     # Rotación del texto de las etiquetas
+)
+```
+
+Se procede a calcular las distancias euclidianas.
+
+```{r echo=FALSE}
+dist_emp <- dist(vivienda_data_finalZ, method = "euclidean")
+```
+
+Se crea y grafica el dendograma para visualizar los posibles clusters a asignar.
+
+```{r echo=FALSE}
+dendograma <- hclust(dist_emp, method = "average")
+
+# Graficar el dendograma
+
+
+plot(dendograma, cex = 0.6, hang = -1, main = "Dendograma de Oferta de Viviendas")
+```
+
+Se grafica la densidad por nodo.
+
+```{r echo=FALSE}
+barplot(sort(dendograma$height, decreasing = TRUE), horiz = TRUE, 
+        main = "Agregaciones (distancias euclidianas)",
+        col = "lightblue", ylab = "Nodo", xlab = "Peso", xlim = c(0, max(dendograma$height)))
+```
+
+Se realiza el grafico del codo para definir el numero de clusters que se tendrán en cuenta.
+
+```{r echo=FALSE}
+wss <- numeric(10)  # Predefinir un vector para guardar los valores de WSS (Within-cluster sum of squares)
+
+for (k in 1:10) {
+  kmeans_result <- kmeans(vivienda_data_finalZ, centers = k, nstart = 25)
+  wss[k] <- kmeans_result$tot.withinss
+}
+
+plot(1:10, wss, type = "b", pch = 19, frame = FALSE, 
+     xlab = "Número de Clústeres",
+     ylab = "Suma de Errores Cuadráticos (WSS)",
+     main = "Método del Codo para Determinar el Número Óptimo de Clústeres")
+```
+
+Se define el numero de clusters y se asignan.
+
+```{r echo=FALSE}
+cluster_assigments <- cutree(dendograma, k = 4)
+```
+
+Se calcula el coeficiente de silhouette (se tiene en cuenta que un numero mas cercano a 1 significa mejor asignación y agrupamiento)
+
+```{r echo=FALSE}
+sil <- silhouette(cluster_assigments, dist_emp)
+sil_avg <- mean(sil[, 3])
+
+cat("Coeficiente de Silhouette promedio k=4 : ", sil_avg, "\n")
+```
+
+Se observa que el coeficiente calculado es una buena cifra y por lo tanto se deduce que esta bien realizada la tecnica de agrupamiento.
+
+
+Se grafica los clusters para una mejor visualización del agrupamiento de las propiedades.
+
+```{r echo=FALSE}
+vivienda_data_finalZ_df <- as.data.frame(vivienda_data_finalZ)
+vivienda_data_finalZ_df$cluster <- as.factor(cluster_assigments)
+
+# Graficar los clusters
+
+
+library(ggplot2)
+ggplot(vivienda_data_finalZ_df, aes(x = Area, y = Precio_m2, color = cluster)) +
+  geom_point(size = 4) +
+  theme_classic() +
+  labs(title = "Distribución de Clústeres", x = "Área Construida", y = "Precio x Metro Cuadrado")
+```
+
+Se cuenta el numero de vivienda en cada cluster.
+
+```{r echo=FALSE}
+cluster_counts <- table(vivienda_data_finalZ_df$cluster)
+print(cluster_counts)
+```
+El coeficiente de Silhouette promedio de 0.576 para k=3 indica una separación razonable entre los conglomerados. Este valor sugiere que los clusters formados están bien definidos, con los puntos dentro de cada conglomerado siendo más similares entre sí que a los puntos en otros conglomerados.
+
+Cluster 1: Probablemente incluye viviendas de menor precio, menor estrato y menos características (como parqueaderos y baños).
+
+Cluster 2: Podría representar propiedades de precio medio con características estándar, como un número moderado de parqueaderos y baños.
+
+Cluster 3: Es posible que incluya propiedades de alto precio, mayor estrato y características superiores, como más área construida y parqueaderos.
+
+Cluster 4: Este grupo puede representar un segmento único, tal vez propiedades de lujo o con características inusuales que las diferencian del resto del mercado.
+
+
+
+
+## 7. Analisis de Correspondencia
+
+
+Se identifica que en el atributo Barrio existen muchos barrios repetidos debido a la falta de estandarizacion (mayusculas, caracteres especiales, espacios) se decide estandarizar esta información con los comandos str_to_lower, chartr, iconv y gsub.
+
+```{r echo=FALSE}
+vivienda_data_final$Barrio=str_to_lower(vivienda_data_final$Barrio)   #Arreglo de barrios, primera en mayuscula resto en minuscula
+vivienda_data_final$Barrio <- chartr("áéíóú", "aeiou", vivienda_data_final$Barrio) #Arreglo de barrios, quitar tildes
+vivienda_data_final$Barrio <- iconv(vivienda_data_final$Barrio, from = "UTF-8", to = "latin1", sub = "")  #Convertir a UTF-8 los barrios, para quitar caracteres especiales
+vivienda_data_final$Barrio <- chartr("©", "e", vivienda_data_final$Barrio) #Arreglo de barrios, cambiar caracter especial por e
+vivienda_data_final$Barrio <- gsub("aguablanca", "agua blanca", vivienda_data_final$Barrio, ignore.case = TRUE)
+vivienda_data_final$Barrio <- gsub("calibella", "cali bella", vivienda_data_final$Barrio, ignore.case = TRUE)
+vivienda_data_final$Barrio <- gsub("calicanto", "cali canto", vivienda_data_final$Barrio, ignore.case = TRUE)
+vivienda_data_final$Barrio <- gsub("ingenio", "el ingenio", vivienda_data_final$Barrio, ignore.case = TRUE)
+vivienda_data_final$Barrio <- gsub("ingenio i", "el ingenio", vivienda_data_final$Barrio, ignore.case = TRUE)
+vivienda_data_final$Barrio <- gsub("ingenio ii", "el ingenio", vivienda_data_final$Barrio, ignore.case = TRUE)
+vivienda_data_final$Barrio <- gsub("el ingenioi", "el ingenio", vivienda_data_final$Barrio, ignore.case = TRUE)
+vivienda_data_final$Barrio <- gsub("el ingenioii", "el ingenio", vivienda_data_final$Barrio, ignore.case = TRUE)
+vivienda_data_final$Barrio <- gsub("el ingenioiii", "el ingenio", vivienda_data_final$Barrio, ignore.case = TRUE)
+vivienda_data_final$Barrio <- gsub("el ingenio 3", "el ingenio", vivienda_data_final$Barrio, ignore.case = TRUE)
+vivienda_data_final$Barrio <- gsub("la rivera i", "la rivera", vivienda_data_final$Barrio, ignore.case = TRUE)
+vivienda_data_final$Barrio <- gsub("la rivera ii", "la rivera", vivienda_data_final$Barrio, ignore.case = TRUE)
+vivienda_data_final$Barrio <- gsub("las ceibas", "la ceiba", vivienda_data_final$Barrio, ignore.case = TRUE)
+vivienda_data_final$Barrio <- gsub("zona norte\\s+los?", "zona norte", vivienda_data_final$Barrio, ignore.case = TRUE)
+vivienda_data_final$Barrio <- gsub("zona sur", "zona sur", vivienda_data_final$Barrio, ignore.case = TRUE)
+vivienda_data_final$Barrio <- gsub("zona centro", "zona centro", vivienda_data_final$Barrio, ignore.case = TRUE)
+vivienda_data_final$Barrio <- gsub("valle del lili", "valle de lili", vivienda_data_final$Barrio, ignore.case = TRUE)
+vivienda_data_final$Barrio <- gsub("jamundi alfaguara", "jamundi", vivienda_data_final$Barrio, ignore.case = TRUE)
+length(unique(vivienda_data_final$Barrio))   #Numero de barrios (valores unicos) en la variable "BARRIO" 386 barrios final
+barrios<-(unique(vivienda_data_final$Barrio))
+```
+
+Se calcula un analisis factorial de datos mixtos para trabajar con las variables zona, tipo y barrio como variables categorias y la variable numerica de estrato.
+
+```{r echo=FALSE}
+res.famd <- FAMD(vivienda_data_final[,c("Zona","Tipo","Barrio","Estrato")], graph = FALSE)
+fviz_screeplot(res.famd, addlabels = TRUE)
+```
+Se debe considerar mas de una dimension si se desea capturar una cantidad significativa de información en los datos.
+
+
+"Correspondencia Zona - Estrato"
+
+```{r echo=FALSE}
+#Tabla de contingencia
+tabla_contingencia_zona_estrato <- table(vivienda_data_final$Zona, vivienda_data_final$Estrato)
+#Prueba chi cuadrado
+chisq.test(tabla_contingencia_zona_estrato)
+#Analisis de correspondencia
+res.ac.ze <- CA(tabla_contingencia_zona_estrato)
+
+
+fviz_screeplot(res.ac.ze, addlabels = TRUE)
+```
+
+Las primeras dos dimensiones explican la mayor parte de la variabilidad en la tabla de contingencia entre Zona y Estrato, sumando casi el 96.1% de la varianza. Esto indica que, para una buena comprensión de la relación entre estas variables, las dos primeras dimensiones deberían ser suficientes.
+
+El valor de Chi-cuadrado muy alto (X-squared = 2172.8) con un p-valor extremadamente pequeño (< 2.2e-16) sugiere que hay una relación significativa entre Zona y Estrato en este conjunto de propiedades.
+
+
+
+"Correspondencia Zona - Barrio"
+
+```{r echo=FALSE}
+#Tabla de contingencia
+tabla_contingencia_zona_barrio <- table(vivienda_data_final$Zona, vivienda_data_final$Barrio)
+#Prueba chi cuadrado
+chisq.test(tabla_contingencia_zona_barrio)
+#Analisis de correspondencia
+res.ac.zb <- CA(tabla_contingencia_zona_barrio)
+
+
+fviz_screeplot(res.ac.zb, addlabels = TRUE)
+```
+El resultado de la prueba de chi-cuadrado indica que existe una asociación significativa entre la variable Zona y la variable Barrio. Con un valor p muy bajo (< 2.2e-16), se rechaza la hipótesis nula de independencia, sugiriendo que las categorías de Zona y Barrio no están distribuidas independientemente entre sí.
+
+## 8. Mapas interactivos y georeferenciación.
+
+
+Se genera los 5 mapas mediante SUBSETS de la data original.
+
+```{r echo=FALSE}
+vivienda_data_final_Zona_Norte <- subset(vivienda_data_final, Zona =="Zona Norte")
+vivienda_data_final_Zona_Sur <- subset(vivienda_data_final, Zona =="Zona Sur")
+vivienda_data_final_Zona_Centro <- subset(vivienda_data_final, Zona =="Zona Centro")
+vivienda_data_final_Zona_Oeste <- subset(vivienda_data_final, Zona =="Zona Oeste")
+vivienda_data_final_Zona_Oriente <- subset(vivienda_data_final, Zona =="Zona Oriente")
+```
+
+Se Muestrea para sacar un maximo de 100 puntos en el MAPA.
+
+```{r echo=FALSE}
+muestra_mapa_vivienda <- vivienda_data_final %>% 
+  sample_n(100)  # Muestra hasta 100 puntos para el mapa
+```
+
+```{r echo=FALSE}
+# Crear el mapa con leaflet
+Mapa_Vivienda <- leaflet(data = muestra_mapa_vivienda) %>%
+  addTiles()  # Agregar el fondo de mapa base
+
+# Crear una paleta de colores y una escala de colores
+pal_precio <- colorNumeric(palette = brewer.pal(9, "RdBu"), domain = muestra_mapa_vivienda$`Precio x metro cuadrado`)
+pal_area <- colorNumeric(palette = colorRampPalette(c("cyan", "black"))(9), domain = muestra_mapa_vivienda$`Area construida`)
+
+# Agregar marcadores para cada punto con información adicional
+Mapa_Vivienda <- Mapa_Vivienda %>%
+  addCircleMarkers(
+    lng = ~Longitud, lat = ~Latitud,
+    radius = ~sqrt(`Area construida`) / 2,  # Tamaño del marcador ajustado (aumentado para mejor visibilidad)
+    color = ~pal_precio(`Precio x metro cuadrado`),  # Color basado en el precio por m²
+    fillOpacity = 0.8,  # Ajustar opacidad del relleno para colores más vivos
+    popup = ~paste("Precio/m²: ", `Precio x metro cuadrado`, "<br>",
+                   "Área Construida: ", `Area construida`, " m²", "<br>",
+                   "Número de parqueaderos: ", `Numero de parqueaderos`, "<br>",
+                   "Habitaciones: ", Habitaciones, "<br>",
+                   "Baños: ", Banos, "<br>",
+                   "Estrato: ", Estrato, "<br>",
+                   "Zona: ", Zona, "<br>",
+                   "Barrio: ", Barrio)
+  ) %>%
+  addLegend(
+    position = "bottomright",
+    pal = pal_precio,
+    values = ~`Precio x metro cuadrado`,
+    title = "Precio por m²",
+    labFormat = labelFormat(prefix = "$")
+  ) %>%
+  addLegend(
+    position = "bottomleft",
+    pal = pal_area,
+    values = ~`Area construida`,
+    title = "Área Construida (m²)",
+    labFormat = labelFormat()
+  )
+
+```
+
+Se genera el mapa interactivo.
+
+```{r echo=FALSE}
+Mapa_Vivienda
+```
+
+## 9. Conclusiones
+
+
+1. El PCA revela que el mercado inmobiliario en la ciudad está claramente segmentado por variables como el precio por metro cuadrado, el área construida y el estrato socioeconómico. Estas variables no solo influyen en la varianza del conjunto de datos, sino que también parecen estar correlacionadas entre sí de manera que reflejan diferentes nichos dentro del mercado inmobiliario. El biplot, al añadir el estrato como dimensión categórica, ayuda a visualizar cómo estas propiedades se agrupan, permitiendo identificar patrones que pueden ser útiles para decisiones estratégicas en el mercado inmobiliario.
+
+2. El analisis de conglomerados sugiere que el mercado inmobiliario en la ciudad está diversificado y se puede agrupar en cuatro segmentos principales. Las variables como el precio por metro cuadrado, área construida, y el número de parqueaderos y baños son las que más influyen en la formación de estos conglomerados. Este tipo de segmentación puede ser clave para desarrollar estrategias específicas de marketing y precios para cada uno de los segmentos, optimizando así la toma de decisiones estratégicas en la empresa inmobiliaria.
+
+3. El análisis de correspondencia permite entender la asociación entre las variables categóricas, como la zona, el estrato y el barrio.
+
+
+
+## 10. Anexos
+
+La información de este analisis se encuentra en el siguiente repositorio:
+
