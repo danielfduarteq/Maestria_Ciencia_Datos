@@ -379,3 +379,4 @@ Para trabajos futuros se debe considerar la transformación de variables o la ad
 
 La información de este analisis se encuentra en el siguiente repositorio:
 
+https://github.com/danielfduarteq/Maestria_Ciencia_Datos/blob/main/Entrega%202%20Informe%20Modelos%20Estadisticos.Rmd
