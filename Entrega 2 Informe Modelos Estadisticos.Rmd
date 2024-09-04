@@ -1,0 +1,381 @@
+---
+title: "Regresión Lineal Multiple "
+author: "Daniel Felipe Duarte Quintero"
+date: "2024-09-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Modelos Estadisticos para la Toma de Decisiones.
+
+## Librerias
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+library(paqueteMODELOS)
+library(naniar)
+library(VIM)
+library(stringr)
+library(FactoMineR)
+library(factoextra)
+library(ggplot2)
+library(mice)
+library(corrplot)
+library(tidyverse)
+library(cluster)
+library(fuzzyjoin)
+library(RColorBrewer)
+library(plotly)
+library(dplyr)
+library(lmtest)
+library(caret)
+library(leaflet)
+library(leaflet.extras)
+data("vivienda")
+```
+
+## Informe Ejecutivo
+
+Este informe presenta el análisis de una base de datos de oferta de viviendas, enfocándose en la estimación de un modelo de regresión lineal múltiple para predecir el precio por metro cuadrado en función de varias variables independientes como área construida, estrato, número de cuartos, parqueaderos, baños, y la zona donde se ubica la vivienda. Además, se presentan los resultados de la validación del modelo y la evaluación de su rendimiento.
+
+
+## Analisis exploratorio de datos
+Para empezar con el analisis estadistico se emplearán tecnicas de revisión de los datos obtenidos por la compañia para identificar posibles patrones, desviaciones, datos faltantes y decidir cual sera la mejor opcion para generar la depuración de la información.
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+summary(vivienda)
+```
+Se cambian los nombres de los encabezados de la tabla.
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+names(vivienda) <- c("Id","Zona","Piso","Estrato","Precio x metro cuadrado","Area construida", "Numero de parqueaderos", "Banos", "Habitaciones","Tipo","Barrio", "Longitud","Latitud")
+```
+Se identifica que la variable Piso esta siendo identificada como de tipo caracter(cualitativo) cuando realmente es cuantitativo y se procede a transformar la variable a numerica.
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+vivienda$Piso <- as.numeric(vivienda$Piso)
+```
+
+Se procede con la imputación de las variables 'Numero de parqueaderos' y 'Piso' que son las que presentan la mayor cantidad de datos faltantes (NA's) y pueden afectar el rendimiento del modelo de regresión lineal multiple (RLM)
+```{r echo=FALSE}
+# Calcular la mediana de 'Número de parqueaderos', omitiendo los NA
+mediana_parqueaderos <- median(vivienda$`Numero de parqueaderos`, na.rm = TRUE)
+
+# Imputar los NA en 'Numero de parqueaderos' con la mediana calculada
+vivienda$`Numero de parqueaderos`[is.na(vivienda$`Numero de parqueaderos`)] <- mediana_parqueaderos
+
+# Calcular la mediana de 'Piso', omitiendo los NA
+mediana_piso <- median(vivienda$Piso, na.rm = TRUE)
+
+# Imputar los NA en 'Piso' con la mediana calculada
+vivienda$Piso[is.na(vivienda$Piso)] <- mediana_piso
+
+# Verificar que las imputaciones se hayan realizado correctamente
+summary(vivienda$`Numero de parqueaderos`)
+summary(vivienda$Piso)
+#Eliminar NA's despues de imputación
+vivienda_data_final <- vivienda [complete.cases(vivienda), ]
+summary(vivienda_data_final)
+```
+
+##	1. Filtro Base de datos: Tipo de vivienda 'Apartamento'. 
+
+```{r}
+# Filtrar la base de datos para incluir solo las ofertas de apartamentos
+apartamentos <- subset(vivienda_data_final, Tipo == "Apartamento")
+
+# Mostrar los primeros 3 registros del dataframe filtrado
+head(apartamentos, 3)
+
+# Verificar el filtro con algunas tablas resumen
+# Tabla de frecuencia para la variable 'Tipo' en la base filtrada
+table(apartamentos$Tipo)
+
+```
+## 2.Analisis exploratorio de datos: correlacion entre variable respuesta(precio de la casa) en funcion de las otras variables.
+
+```{r echo=FALSE}
+
+#Correlacion Precio vs Area Construida
+p1 <- ggplot(vivienda_data_final, aes(x = `Area construida`, y = `Precio x metro cuadrado`)) +
+  geom_point(aes(color = Estrato)) +
+  labs(title = "Precio de la vivienda vs. Área construida",
+       x = "Área construida (m²)",
+       y = "Precio (COP/m²)") +
+  theme_minimal()
+
+# Convertir a un gráfico interactivo con plotly
+p1_plotly <- ggplotly(p1)
+p1_plotly
+
+```
+Se identifica que a mayor area construida mayor es el precio de la vivienda, teniendo como ciertos datos fuera de la tendencia ciertas propiedades de los estratos 3 que tienen un gran area construida y su precio es bajo.
+
+```{r echo=FALSE}
+
+#Correlacion Precio vs. Número de baños
+p2 <- ggplot(vivienda_data_final, aes(x = Banos, y = `Precio x metro cuadrado`)) +
+  geom_point(aes(color = Estrato)) +
+  labs(title = "Precio de la vivienda vs. Número de baños",
+       x = "Número de baños",
+       y = "Precio (COP/m²)") +
+  theme_minimal()
+
+# Convertir a un gráfico interactivo con plotly
+p2_plotly <- ggplotly(p2)
+p2_plotly
+
+```
+No existe una correlacion marcada entre el precio de la vivienda y el numero de baños.
+
+```{r echo=FALSE}
+#Correlacion Precio vs. Número de habitaciones
+p3 <- ggplot(vivienda_data_final, aes(x = Habitaciones, y = `Precio x metro cuadrado`)) +
+  geom_point(aes(color = Estrato)) +
+  labs(title = "Precio de la vivienda vs. Número de habitaciones",
+       x = "Número de habitaciones",
+       y = "Precio (COP/m²)") +
+  theme_minimal()
+
+# Convertir a un gráfico interactivo con plotly
+p3_plotly <- ggplotly(p3)
+p3_plotly
+```
+No existe una correlacion marcada entre el precio de la vivienda y el numero de baños.
+
+```{r echo=FALSE}
+#Correlacion Precio vs. Zona
+p4 <- ggplot(vivienda_data_final, aes(x = Zona, y = `Precio x metro cuadrado`)) +
+  geom_boxplot(aes(fill = Zona)) +
+  labs(title = "Precio de la vivienda vs. Zona",
+       x = "Zona",
+       y = "Precio (COP/m²)") +
+  theme_minimal()
+
+# Convertir a un gráfico interactivo con plotly
+p4_plotly <- ggplotly(p4)
+p4_plotly
+```
+
+Se puede identificar que las vivienda con mayor precio por metro cuadrado estan ubicadas en la Zona Oeste, seguidos de Zona Sur y Zona Norte. Las zonas con mayor numero de datos atipicos son Zona Norte y Zona Sur.
+
+```{r echo=FALSE}
+#Correlacion Precio vs. Estrato
+p5 <- ggplot(vivienda_data_final, aes(x = Estrato, y = `Precio x metro cuadrado`)) +
+  geom_point(aes(color = Estrato)) +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +  # Línea de regresión lineal
+  labs(title = "Relación entre Estrato y Precio x metro cuadrado",
+       x = "Estrato",
+       y = "Precio (COP/m²)") +
+  theme_minimal()
+
+# Convertir a un gráfico interactivo con plotly
+p_estrato_precio_plotly <- ggplotly(p5)
+p_estrato_precio_plotly
+```
+
+Existe una correlacion positiva entre el estrato y el precio por metro cuadrado.
+
+
+## 3. Modelo de Regresión Lineal Multiple
+
+```{r}
+ModeloRLM <- lm(`Precio x metro cuadrado` ~ `Area construida` + Estrato + Habitaciones + `Numero de parqueaderos` + Banos, data = vivienda_data_final)
+
+# Resumen del modelo de regresión lineal multiple
+summary(ModeloRLM)
+
+```
+Todos los coeficientes estimados son estadísticamente significativos, ya que todos tienen un valor p (Pr(>|t|)) menor a 0.001. Lo que indica que las variables independientes tienen un efecto significativo sobre el precio por metro cuadrado.
+
+Área construida: 0.87
+
+Por cada metro cuadrado adicional de área construida, el precio por metro cuadrado aumenta en promedio 0.87 unidades monetarias, manteniendo constantes las demás variables. Este resultado es lógico, ya que las propiedades más grandes tienden a tener un precio mayor por metro cuadrado.
+
+Estrato: 103.87
+
+Por cada incremento en el estrato, el precio por metro cuadrado aumenta en promedio 103.87 unidades monetarias, manteniendo constantes las demás variables. Esto es coherente con lo esperado, ya que los inmuebles en zonas de mayor estrato social suelen ser más caros.
+
+Habitaciones: -23.43
+
+Cada habitación adicional se asocia con una disminución de 23.43 unidades monetarias en el precio por metro cuadrado, manteniendo constantes las demás variables. Este resultado puede parecer contraintuitivo a primera vista, pero podría reflejar que las propiedades con más habitaciones tienden a ser más grandes y, por lo tanto, el precio por metro cuadrado disminuye al distribuirse el precio total sobre una mayor cantidad de metros cuadrados.
+
+Número de parqueaderos: 71.28
+
+Por cada parqueadero adicional, el precio por metro cuadrado aumenta en promedio 71.28 unidades monetarias, manteniendo constantes las demás variables. Esto tiene sentido, ya que las propiedades con más parqueaderos suelen ser más atractivas y costosas.
+
+Baños: 55.55
+
+Por cada baño adicional, el precio por metro cuadrado aumenta en promedio 55.55 unidades monetarias, manteniendo constantes las demás variables. Las propiedades con más baños suelen ser más convenientes y, por lo tanto, más caras.
+
+**Interpretación del R2**
+
+R²: 0.7292
+
+El coeficiente de determinación R² indica que aproximadamente el 72.92% de la variabilidad en el precio por metro cuadrado puede ser explicada por las variables independientes incluidas en el modelo (área construida, estrato, número de habitaciones, número de parqueaderos y número de baños). Este es un buen ajuste, lo que sugiere que el modelo captura bien la relación entre las variables.
+R² ajustado: 0.729
+
+El R² ajustado corrige el R² para el número de predictores en el modelo, proporcionando una mejor estimación del poder explicativo real del modelo. En este caso, el valor ajustado es muy cercano al R² original, lo que indica que el modelo no está sobreajustado.
+
+## 4. Validación de supuestos del modelo e interpretación de resultados.
+
+```{r}
+par(mfrow = c(2, 2))
+plot(ModeloRLM)
+
+#Prueba Durbin-Watson (Independencia)
+dwtest(ModeloRLM)
+
+#Prueba Breusch-Pagan (Homoscedasticidad)
+bptest(ModeloRLM)
+
+#Prueba Kolmogorov-Smirnov (Normalidad)
+ks.test(ModeloRLM$residuals, "pnorm", mean=mean(ModeloRLM$residuals), sd=sd(ModeloRLM$residuals))
+
+```
+
+Independencia: Con un valor de 1.6199, esta relativamente cerca de 2, pero ligeramente por debajo, lo que sugiere que podría haber una ligera autocorrelación positiva en los residuos. Es algo a tener en cuenta.
+
+Homoscedasticidad: En este caso, dado que el p-valor es extremadamente bajo (p-value < 2.2e-16), incluso un valor del estadístico Breusch-Pagan más bajo podría ser significativo. Esto significa que la heterocedasticidad es evidente y estadísticamente significativa, sugiere que la varianza de los errores no es constante.
+
+Normalidad: El valor de 0.13433 del test de Kolmogorov-Smirnov (KS) representa la mayor discrepancia observada entre la distribución empírica de los residuos y la distribución normal teórica. Se sugiere que los residuos del modelo no siguen una distribución normal. En general, para un buen ajuste del modelo de regresión, queremos que los residuos se asemejen lo más posible a una distribución normal.
+
+## 5.	Partición de los datos aleatoriamente 70% entreno (train) y 30% prueba (test). Estimacion del modelo con los datos de entrenamiento.
+
+```{r}
+# Cargar paquetes necesarios
+library(caret)
+
+# Establecer semilla para reproducibilidad
+set.seed(42)
+
+# Crear partición para entrenamiento (70%) y prueba (30%)
+partition <- createDataPartition(vivienda_data_final$`Precio x metro cuadrado`, p = 0.7, list = FALSE)
+train_data <- vivienda_data_final[partition, ]
+test_data <- vivienda_data_final[-partition, ]
+
+# Ajustar el modelo de regresión lineal múltiple con los datos de entrenamiento
+ModeloRLM_train <- lm(`Precio x metro cuadrado` ~ `Area construida` + Estrato + Habitaciones + `Numero de parqueaderos` + Banos, data = train_data)
+
+# Resumen del modelo
+summary(ModeloRLM_train)
+
+par(mfrow = c(2, 2))
+plot(ModeloRLM_train)
+```
+
+## 6.	Predicciones con el modelo anterior usando los datos de prueba (30%).
+
+```{r}
+
+# Realizar predicciones en el conjunto de prueba
+predicciones <- predict(ModeloRLM_train, newdata = test_data)
+
+# Comparar las predicciones con los valores reales
+resultados <- data.frame(Real = test_data$`Precio x metro cuadrado`, Predicho = predicciones)
+
+# Mostrar las primeras filas de los resultados
+head(resultados)
+
+#Grafico
+grafico_interactivo <- plot_ly(
+  data = resultados,
+  x = ~Real,
+  y = ~Predicho,
+  type = 'scatter',
+  mode = 'markers',
+  marker = list(
+    size = 10,
+    color = ~Predicho,  # Color basado en los valores predichos
+    colorscale = 'Viridis',  # Gradiente de colores
+    colorbar = list(title = 'Valor Predicho'),
+    line = list(width = 2, color = 'rgba(0, 0, 0, .5)')
+  ),
+  text = ~paste("Real: ", Real, "<br>Predicho: ", Predicho),
+  hoverinfo = 'text'
+) %>%
+  layout(
+    title = 'Valores Reales vs Predicciones',
+    xaxis = list(title = 'Valores Reales'),
+    yaxis = list(title = 'Valores Predichos'),
+    showlegend = FALSE
+  )
+
+# Mostrar el gráfico interactivo
+grafico_interactivo
+
+```
+
+## 7.	Evaluación del modelo e interpretación.
+
+```{r}
+
+# Calcular el Error Cuadrático Medio (RMSE)
+rmse <- sqrt(mean((resultados$Real - resultados$Predicho)^2))
+cat("RMSE: ", rmse, "\n")
+
+# Calcular el Error Absoluto Medio (MAE)
+mae <- mean(abs(resultados$Real - resultados$Predicho))
+cat("MAE: ", mae, "\n")
+
+# Calcular el R^2 (Coeficiente de Determinación)
+r2 <- cor(resultados$Real, resultados$Predicho)^2
+cat("R^2: ", r2, "\n")
+```
+
+El Error Cuadrático Medio (RMSE) del modelo es 176.05. Esto indica que, en promedio, la diferencia entre los valores predichos y los valores reales es de aproximadamente 176.05 unidades. 
+
+El Error Absoluto Medio (MAE) es 111.63, lo que indica que, en promedio, la diferencia absoluta entre los valores predichos y los valores reales es de 111.63 unidades. Este valor proporciona una medida directa de la magnitud de los errores del modelo sin tener en cuenta la dirección de los mismos.
+
+El coeficiente de determinación R2 es 0.73, lo que significa que aproximadamente el 73% de la variabilidad en los valores de la variable dependiente es explicada por el modelo. Un R2 más alto indica un mejor ajuste del modelo a los datos.
+  
+## 8. Mapas interactivos y georeferenciación.
+
+```{r echo=FALSE}
+# Muestrear para sacar un máximo de 500 puntos en el mapa
+muestra_mapa_vivienda <- vivienda_data_final %>% 
+  sample_n(500)  # Muestra hasta 500 puntos para el mapa
+
+# Crear el mapa interactivo con círculos y popups
+mapa_interactivo <- leaflet(data = muestra_mapa_vivienda) %>%
+  addTiles() %>%
+  addCircles(
+    lng = ~Longitud,
+    lat = ~Latitud,
+    radius = ~`Precio x metro cuadrado` / 10,  # Tamaño del círculo basado en el precio
+    color = ~colorNumeric(palette = c("blue", "green", "yellow", "red"), domain = muestra_mapa_vivienda$`Precio x metro cuadrado`)(`Precio x metro cuadrado`),
+    popup = ~paste(
+      "ID: ", Id, "<br>",
+      "Zona: ", Zona, "<br>",
+      "Área Construida: ", `Area construida`, " m²<br>",
+      "Número de Parqueaderos: ", `Numero de parqueaderos`, "<br>",
+      "Número de Baños: ", Banos, "<br>",
+      "Número de Habitaciones: ", Habitaciones, "<br>",
+      "Precio x Metro Cuadrado: $", round(`Precio x metro cuadrado`, 2)
+    ),
+    fillOpacity = 0.7  # Opacidad del relleno del círculo
+  ) %>%
+  addLegend(
+    position = "bottomright",
+    pal = colorNumeric(palette = c("blue", "green", "yellow", "red"), domain = muestra_mapa_vivienda$`Precio x metro cuadrado`),
+    values = muestra_mapa_vivienda$`Precio x metro cuadrado`,
+    title = "Precio x Metro Cuadrado"
+  )
+
+# Mostrar el mapa
+mapa_interactivo
+
+```
+
+
+## 9. Conclusiones
+
+
+El modelo de regresión lineal múltiple, que incluye las variables Área construida, Estrato, Habitaciones, Número de parqueaderos y Baños, muestra una relación significativa con el Precio x metro cuadrado de las viviendas. Los coeficientes del modelo son estadísticamente significativos, indicando que cada una de estas variables tiene un impacto importante en el precio por metro cuadrado.
+
+Para trabajos futuros se debe considerar la transformación de variables o la adición de variables no lineales para abordar la no normalidad y la heteroscedasticidad, se debe evaluar el modelo para multicolinealidad y considerar la eliminación de variables redundantes.
+
+
+## 10. Anexos
+
+La información de este analisis se encuentra en el siguiente repositorio:
+
