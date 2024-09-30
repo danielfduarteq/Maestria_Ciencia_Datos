@@ -1,0 +1,409 @@
+---
+title: "Rotacion de Cargo"
+author: "Daniel Felipe Duarte Quintero"
+date: "2024-09-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Modelos Estadisticos para la Toma de Decisiones.
+
+## Librerias
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+library(paqueteMODELOS)
+library(ggplot2)
+library(mice)
+library(corrplot)
+library(tidyverse)
+library(plotly)
+library(dplyr)
+library(lmtest)
+library(caret)
+library(skimr)
+library(pROC)
+library(ggplot2)
+
+data("rotacion")
+```
+
+## Rotacion de cargo
+
+En una organización, se busca comprender y prever los factores que influyen en la rotación de empleados entre distintos cargos. La empresa ha recopilado datos históricos sobre el empleo de sus trabajadores, incluyendo variables como la antigüedad en el cargo actual, el nivel de satisfacción laboral, el salario actual, edad y otros factores relevantes. La gerencia planea desarrollar un modelo de regresión logística que permita estimar la probabilidad de que un empleado cambie de cargo en el próximo período y determinar cuales factores indicen en mayor proporción a estos cambios.
+
+Con esta información, la empresa podrá tomar medidas proactivas para retener a su talento clave, identificar áreas de mejora en la gestión de recursos humanos y fomentar un ambiente laboral más estable y tranquilo. La predicción de la probabilidad de rotación de empleados ayudará a la empresa a tomar decisiones estratégicas informadas y a mantener un equipo de trabajo comprometido y satisfecho en sus roles actuales.
+
+## 1. Selección de 3 variables categorias y 3 variables cuantitativas
+
+**Variables Categóricas**
+
+Horas Extra: Se relaciona la rotación de los empleados a las horas extras debido a que se sobrecargan de trabajo y no tiene tiempo para actividad fuera del trabajo como tiempo para compartir en familia entre otros.
+
+Viaje de Negocios: Se asocia la rotación con las personas que viajan porque al estar mas tiempo distanciados de la familia, amigos y circulo social se sienten aislados y prefieren estar en un sitio fijo para mantener cerca, por lo tanto quienes viajan son propensos a rotar.
+
+Estado Civil: Los empleados que son solteros o divorciados pueden tener una mayor tendencia a cambiar de trabajo en comparación con aquellos que están casados. El estado civil influye en las responsabilidades financieras; quienes están casados a menudo enfrentan mayores compromisos económicos, lo que los hace más sensibles a la remuneración y los beneficios que ofrece su empleo. Si sienten que estos aspectos no cubren sus necesidades familiares, podrían buscar nuevas oportunidades con una compensación más atractiva.
+
+**Variables Cuantitativas**
+
+Edad: Generalmente, se espera que los empleados más jóvenes tiendan a cambiar de trabajo con mayor frecuencia, mientras que los trabajadores de mayor edad lo hagan con menos frecuencia. Los jóvenes suelen tener más flexibilidad para adaptarse a cambios y buscan constantemente nuevas oportunidades o mejores condiciones laborales debido a diversos factores, como el desarrollo profesional, el bienestar emocional o la búsqueda de un mejor equilibrio salarial.
+
+Ingreso Mensual: La remuneración adecuada y competitiva es un factor crucial para los empleados. Si sienten que su salario no se ajusta a sus responsabilidades, carga de trabajo o al mercado laboral, es más probable que consideren buscar empleo en otras empresas que ofrezcan mejores condiciones salariales.
+
+Antigüedad en el Cargo: Los empleados con más tiempo en un mismo puesto podrían mostrar una mayor propensión a buscar nuevas oportunidades si sienten que ya no tienen espacio para desarrollarse o avanzar en su carrera. Por el contrario, aquellos con menor antigüedad suelen estar en procesos de adaptación, por lo que es menos probable que consideren un cambio inmediato. La falta de perspectivas de crecimiento profesional en un puesto actual puede generar insatisfacción y, eventualmente, fomentar el deseo de explorar nuevas áreas.
+
+**Hipotesis**
+
+Horas Extra: Se espera que los empleados que trabajan horas extras tengan una mayor probabilidad de rotación que las que no lo hacen debido a la necesidad de tener más tiempo para actividades fuera del trabajo.
+
+Viaje de Negocios: Se espera que los empleados que tienen viajes de negocios tengan una mayor probabilidad de rotación que las que no lo hacen, debido a la necesidad de tener más tiempo para actividades fuera del trabajo.
+
+Estado Civil: Se supone que los empleados solteros, al tener menos compromisos familiares, pueden tener una mayor propensión a cambiar de trabajo en comparación con los casados o divorciados.
+
+Edad: Se anticipa que los empleados más jóvenes muestren mayores índices de rotación, mientras que los trabajadores de mayor edad tienden a permanecer más tiempo en sus empleos.
+
+Ingreso Mensual: Aquellos empleados con salarios más bajos son más propensos a dejar su puesto en búsqueda de mejores oportunidades, en contraste con quienes perciben ingresos más altos.
+
+Antigüedad en el Cargo: Los empleados con menor antigüedad podrían tener una mayor tendencia a rotar en comparación con aquellos que llevan más tiempo en su puesto actual.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+skim(rotacion)
+```
+
+## 2. Análisis univariado (caracterización) de las seis variables seleccionadas.
+
+**Horas_Extra**
+
+```{r echo=FALSE}
+
+# Tabla de frecuencias para Horas Extra
+table(rotacion$Horas_Extra)
+
+# Proporciones
+prop.table(table(rotacion$Horas_Extra))
+
+# Visualización de frecuencias
+library(ggplot2)
+ggplot(rotacion, aes(x = Horas_Extra)) +
+  geom_bar() +
+  labs(title = "Distribución de Horas Extras", x = "Horas_Extra", y = "Frecuencia") +
+  theme_minimal()
+
+```
+
+**Viajes de Negocios**
+
+```{r echo=FALSE}
+
+# Tabla de frecuencias para Viajes de Negocios
+table(rotacion$`Viaje de Negocios`)
+
+# Proporciones
+prop.table(table(rotacion$`Viaje de Negocios`))
+
+# Visualización de frecuencias
+ggplot(rotacion, aes(x = `Viaje de Negocios`)) +
+  geom_bar() +
+  labs(title = "Distribución de Viaje de Negocios", x = "Viaje de Negocios", y = "Frecuencia") +
+  theme_minimal()
+
+```
+
+**Estado Civil**
+
+```{r echo=FALSE}
+
+# Tabla de frecuencias para Estado Civil
+table(rotacion$Estado_Civil)
+
+# Proporciones
+prop.table(table(rotacion$Estado_Civil))
+
+# Visualización de frecuencias
+ggplot(rotacion, aes(x = Estado_Civil)) +
+  geom_bar() +
+  labs(title = "Distribución de Estado Civil", x = "Estado Civil", y = "Frecuencia") +
+  theme_minimal()
+```
+
+**Graficas de variables cualitativas:**
+
+Se observa que la mayoría de los trabajadores no hacen horas extras.
+
+Se observa que la mayoria de los trabajadores raramente viaja.
+
+Siendo más representativo el grupo de los casados dentro de la organización, debemos pensar en que su rotación se podria ver afectada por la responsabilidad que tienen frente a sus familias, el creciente numero de gastos, el tiempo en familia que requieren y tambien los largos desplazamientos del trabajo a la casa.
+
+**Edad**
+
+```{r echo=FALSE}
+
+# Resumen estadístico para Edad
+summary(rotacion$Edad)
+
+# Visualización de la distribución de Edad
+ggplot(rotacion, aes(x = Edad)) +
+  geom_histogram(binwidth = 5, fill = "skyblue", color = "black") +
+  labs(title = "Distribución de Edad", x = "Edad", y = "Frecuencia") +
+  theme_minimal()
+
+```
+
+**Ingreso Mensual**
+
+```{r echo=FALSE}
+
+# Resumen estadístico para Ingreso Mensual
+summary(rotacion$Ingreso_Mensual)
+
+# Visualización de la distribución del Ingreso Mensual
+ggplot(rotacion, aes(x = Ingreso_Mensual)) +
+  geom_histogram(binwidth = 1000, fill = "lightgreen", color = "black") +
+  labs(title = "Distribución de Ingreso Mensual", x = "Ingreso Mensual", y = "Frecuencia") +
+  theme_minimal()
+```
+
+**Antiguedad en el cargo**
+
+```{r echo=FALSE}
+
+# Resumen estadístico para Antigüedad en el Cargo
+summary(rotacion$Antigüedad_Cargo)
+
+# Visualización de la distribución de Antigüedad en el Cargo
+ggplot(rotacion, aes(x = Antigüedad_Cargo)) +
+  geom_histogram(binwidth = 2, fill = "coral", color = "black") +
+  labs(title = "Distribución de Antigüedad en el Cargo", x = "Antigüedad en el Cargo (años)", y = "Frecuencia") +
+  theme_minimal()
+
+```
+
+**Graficas de variables cuantitativas:**
+
+La distribución de la variable Edad muestra personas entre los 25 y 45 años, en esta edad es donde se presentan los mayores cambios de empleo debido a los retos personales, las aspiraciones y los incrementos salariales que buscan las personas, despues de cierta edad las personas tienden a buscar mas estabilidad.
+
+La gráfica muestra que la mayoria de los trabajadores se concentran en los bajos salarios de la compañia y que hay una brecha muy grande entre los rangos salariales, la carga salarial esta concentrada entre los 1000 y los 6000, pero existen personas con salario entre 10000 y 20000.
+
+La mayoria de los empleados tienen menos de 7 años en la organización por lo cual pueden ser propensos a rotar. A mayor edad y tiempo en la compañia los empleados tienen a rotar mucho menos.
+
+## 3 . Análisis bivariado en donde la variable respuesta sea rotacion codificada de la siguiente manera (y=1 es si rotación, y=0 es no rotación). Con base en estos resultados identifique cuales son las variables determinantes de la rotación e interpretar el signo del coeficiente estimado. Compare estos resultados con la hipotesis planteada en el punto 2.
+
+```{r}
+# Convertir la variable rotación a binaria
+rotacion$Rotación <- ifelse(rotacion$Rotación == "Si", 1, 0)
+
+```
+
+**Horas Extra vs Rotación**
+
+```{r}
+# Tabla de contingencia para Horas Extra y Rotación
+table(rotacion$Horas_Extra, rotacion$Rotación)
+
+# Test de chi-cuadrado
+chisq.test(rotacion$Horas_Extra, rotacion$Rotación)
+```
+
+El p-valor menor a 0.05 indica que existe una asociación altamente significativa entre si el empleados hace horas extras y la rotación.
+
+**Viaje de Negocios vs Rotación**
+
+```{r}
+# Tabla de contingencia para Viaje de Negocios y Rotación
+table(rotacion$`Viaje de Negocios`, rotacion$Rotación)
+
+# Test de chi-cuadrado
+chisq.test(rotacion$`Viaje de Negocios`, rotacion$Rotación)
+```
+El p-valor menor a 0.05 indica que existe una asociación significativa entre si el empleados hace viajes por el trabajo y la rotación.
+
+**Estado Civil vs Rotación**
+
+```{r}
+# Tabla de contingencia para Estado Civil y Rotación
+table(rotacion$Estado_Civil, rotacion$Rotación)
+
+# Test de chi-cuadrado
+chisq.test(rotacion$Estado_Civil, rotacion$Rotación)
+```
+
+El p-valor significativamente bajo indica que hay una asociación fuerte y significativa entre el estado civil y la rotación. Esto significa que la probabilidad de rotación de los empleados depende del estado civil.
+
+**Edad/ Ingreso Mensual/ Antiguedad_Cargo vs Rotación**
+
+```{r}
+# Modelo de regresión logística para las variables numéricas
+modelo <- glm(Rotación ~ Edad + Ingreso_Mensual + Antigüedad_Cargo, data = rotacion, family = binomial)
+
+# Resumen del modelo
+summary(modelo)
+```
+
+Edad: La hipótesis se confirma, ya que los empleados más jóvenes tienen una mayor rotación.
+
+Ingreso Mensual: La hipótesis es confirmada, pues aquellos con ingresos más bajos tienen mayor probabilidad de rotación.
+
+Antigüedad en el Cargo: La hipótesis también se verifica; los empleados con menor antigüedad tienden a rotar más.
+
+## 4 . Particion de los datos de forma aleatoria 70% train 30% test, estimación de modelo logistico con el train (70%). Presentación de Resultados.
+
+El modelo logistico se calculará basado en los resultados obtenidos respecto a la variable Rotación es decir con las variables Departamento, Estado Civil, Edad, Ingreso Mensual, Antiguedad_Cargo, la variable Genero queda descartada al presentar una asociacion debil o nula.
+
+Se debe convertir la variable 'Viaje de Negocios' y 'Estado Civil' a variables dummy.
+
+```{r echo=FALSE}
+# Variables como factores
+rotacion$Estado_Civil <- as.factor(rotacion$Estado_Civil)
+rotacion$`Viaje de Negocios` <- as.factor(rotacion$`Viaje de Negocios`)
+
+# Crear variables dummy para Estado Civil
+rotacion <- rotacion %>%
+  mutate(
+    dummy_soltero = ifelse(Estado_Civil == "Soltero", 1, 0),
+    dummy_divorciado = ifelse(Estado_Civil == "Divorciado", 1, 0)
+  )
+
+# Crear variables dummy para Viaje de Negocios
+rotacion <- rotacion %>%
+  mutate(
+    dummy_frecuentemente = ifelse(`Viaje de Negocios` == "Frecuentemente", 1, 0),
+    dummy_no_viaja = ifelse(`Viaje de Negocios` == "No_Viaja", 1, 0)
+  )
+```
+**División del dataset Rotación**
+
+```{r}
+
+# Establecer una semilla para la reproducibilidad
+set.seed(123)
+
+# Crear índices aleatorios para el conjunto de entrenamiento
+train_indices <- sample(1:nrow(rotacion), size = 0.7 * nrow(rotacion))
+
+# Dividir el conjunto de datos
+train_set <- rotacion[train_indices, ]
+test_set <- rotacion[-train_indices, ]
+
+```
+
+**Modelo de Regresión Logistica**
+
+```{r}
+modelo_logistico <- glm(Rotación ~ dummy_frecuentemente + dummy_no_viaja + dummy_soltero + dummy_divorciado + Edad + Ingreso_Mensual + Antigüedad_Cargo + Horas_Extra, 
+                         family = binomial, data = train_set)
+
+# Resumen del modelo
+summary(modelo_logistico)
+```
+
+**Interpretación: Oportunidad (odds)**
+
+```{r}
+coeficientes <- summary(modelo_logistico)$coefficients[, "Estimate"]
+odds <- exp(coeficientes)
+resultados <- data.frame(Variable = names(coeficientes), Estimate = coeficientes, Odds = odds)
+print(resultados)
+
+```
+
+-   dummy_frecuentemente:
+Odds: 2.0663. Las probabilidades son aproximadamente el doble (106.63% más) en comparación con la categoría de referencia (raramente).
+
+-   dummy_no_viaja:
+Odds: 0.5827. La probabilidad es aproximadamente un 41.73% menor en comparación con la categoría de referencia (raramente.)
+
+-   dummy_soltero:
+Odds: 2.3111. Esto significa que las probabilidades son aproximadamente el 131.11% más altas en comparación con la categoría de referencia (Casado).
+
+-   dummy_divorciado:
+Odds: 0.6430. Las probabilidades son un 35.70% menores en comparación con la categoría de referencia (Casado).
+
+-   Edad:
+Odds: 0.9617. Esto indica que por cada año adicional de edad, la probabilidad de rotación disminuye en un 3.83%.
+
+-   Ingreso_Mensual:
+Odds: 0.9999. Las probabilidades apenas se ven afectadas por el ingreso mensual.
+
+-   Antigüedad_Cargo:
+Odds: 0.9021. Cada año adicional en el cargo disminuye la probabilidad de rotación en aproximadamente un 9.79%.
+
+-   Horas_ExtraSi:
+Odds: 3.9574. Esto significa que aquellos que trabajan horas extra tienen casi cuatro veces más probabilidades de rotar en comparación con aquellos que no lo hacen.
+
+**Conclusiones modelo logistico**
+Los resultados indican que las variables de estado civil, horas extra y edad son factores significativos en la rotación de personal. Especialmente, trabajar horas extra y ser soltero están fuertemente asociados con una mayor probabilidad de rotación.
+
+## 5 . Evaluación del poder predictivo del modelo con base en la curva ROC y el AUC en el set de datos de prueba.
+
+```{r echo=FALSE}
+
+# Predecir probabilidades en el conjunto de prueba
+predicciones_prob <- predict(modelo_logistico, newdata = test_set, type = "response")
+
+# Crear la curva ROC
+roc_result <- roc(test_set$Rotación, predicciones_prob)
+
+# Calcular el AUC
+auc_value <- auc(roc_result)
+
+# Mostrar el AUC
+print(paste("AUC:", auc_value))
+
+# Graficar la curva ROC
+library(ggplot2)
+
+ggroc(roc_result, color = "cyan", size = 1.5) + 
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") + 
+  ggtitle(paste("Curva ROC (AUC =", round(auc_value, 3), ")")) + 
+  xlab("Especificidad") + 
+  ylab("Sensibilidad") +
+  theme_minimal(base_size = 15) + 
+  theme(plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12)) +
+  scale_color_manual(values = c("cyan"))
+
+
+```
+
+El AUC del 0.7306 indica que el modelo puede predecir en un 73.06% de los casos si un empleado rota o no.
+
+```{r echo=FALSE}
+# Establecer un umbral para clasificar las probabilidades
+umbral <- 0.5  # Ajusta este umbral según sea necesario
+
+# Realizar predicciones en el conjunto de prueba
+predicciones_clase <- ifelse(predicciones_prob > umbral, 1, 0)
+
+# Crear la tabla de confusión
+conf_matrix <- confusionMatrix(as.factor(predicciones_clase), as.factor(test_set$Rotación))
+
+# Calcular la precisión (accuracy)
+accuracy <- sum(predicciones_clase == test_set$Rotación) / length(test_set$Rotación)
+
+# Imprimir la precisión
+cat("Precisión (Accuracy):", accuracy, "\n")
+
+```
+
+Un Accuracy del 0.8412 indicada que aproximadamente el 84.12% de las predicciones del modelo son correctas.
+
+## 6. Conclusiones
+
+Se realizan las siguientes recomendaciones a la compañia para disminuir y evitar la rotación del personal.
+
+-   Se debe replantear la politica de viajes esta demostrado que los empleados que mas viajas son los que mas rotan, esto debido a que buscan el equilibrio entre el trabajo y su vida personal.
+-   Se debe replantear basado en el estado civil de los empleados paquetes de salario emocional a los empleados solteros horarios flexibles y a los empleados casados beneficios de espacios familiares con hijos y pareja.
+-   En cuanto a las horas extra se debe definir un tope maximo a generar en cada empleado y evaluar la politica de remuneración que incentive que estan se desarrollen.
+-   A los empleados nuevos incentivar el plan carrera, capacitación y desarrollo profesional esto hará que los empleados se sientan mas valorados y comprometidos.
+
+## 7. Anexos
+
+La información de este analisis se encuentra en el siguiente repositorio:
+
+
