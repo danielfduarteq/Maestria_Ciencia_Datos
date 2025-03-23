@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Charts - Informe de Juegos Android</title>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+        google.charts.load('current', {'packages':['corechart', 'bar', 'scatter']});
+        google.charts.setOnLoadCallback(loadData);
+
+        function loadData() {
+            fetch('android_games_sales.json')
+                .then(response => response.json())
+                .then(data => drawCharts(data))
+                .catch(error => console.error('Error cargando el JSON:', error));
+        }
+
+        function drawCharts(data) {
+            var gamesData = data.map(game => [
+                game.title,
+                game.User_Rating || 0,
+                game.Critic_Rating || 0,
+                game.Global_Sales || 0,
+                game.category,
+                game["growth (30 days)"] || 0,
+                game["growth (60 days)"] || 0,
+                game.total_ratings || 0
+            ]);
+
+            var topUserRating = google.visualization.arrayToDataTable([
+                ['Juego', 'User Rating'],
+                ...gamesData.sort((a, b) => b[1] - a[1]).slice(0, 10).map(row => [row[0], row[1]])
+            ]);
+            new google.visualization.BarChart(document.getElementById('top_user_ratings'))
+                .draw(topUserRating, {title: 'Top 10 Juegos con Mejor User Rating'});
+
+            var topCriticRating = google.visualization.arrayToDataTable([
+                ['Juego', 'Critic Rating'],
+                ...gamesData.sort((a, b) => b[2] - a[2]).slice(0, 10).map(row => [row[0], row[2]])
+            ]);
+            new google.visualization.BarChart(document.getElementById('top_critic_ratings'))
+                .draw(topCriticRating, {title: 'Top 10 Juegos con Mejor Critic Rating'});
+
+            var categorySales = {};
+            gamesData.forEach(row => {
+                categorySales[row[4]] = (categorySales[row[4]] || 0) + row[3];
+            });
+            var salesData = google.visualization.arrayToDataTable([
+                ['Categoría', 'Ventas Globales'],
+                ...Object.entries(categorySales)
+            ]);
+            new google.visualization.PieChart(document.getElementById('global_sales'))
+                .draw(salesData, {title: 'Ventas Globales por Categoría', is3D: true});
+
+            var correlationData = google.visualization.arrayToDataTable([
+                ['Total Ratings', 'Ventas Globales'],
+                ...gamesData.map(row => [row[7], row[3]])
+            ]);
+            new google.visualization.ScatterChart(document.getElementById('correlation_ratings_sales'))
+                .draw(correlationData, {title: 'Correlación: Total Ratings vs Ventas Globales', hAxis: {title: 'Total Ratings'}, vAxis: {title: 'Ventas Globales'}});
+
+            var growthComparisonData = google.visualization.arrayToDataTable([
+                ['Crecimiento 30 días', 'Crecimiento 60 días'],
+                ...gamesData.map(row => [row[5], row[6]])
+            ]);
+            new google.visualization.ScatterChart(document.getElementById('growth_comparison'))
+                .draw(growthComparisonData, {title: 'Crecimiento 30 días vs Crecimiento 60 días', hAxis: {title: 'Growth 30 días'}, vAxis: {title: 'Growth 60 días'}});
+
+            var top10Data = google.visualization.arrayToDataTable([
+                ['Juego', 'Ventas Globales'],
+                ...gamesData.sort((a, b) => b[3] - a[3]).slice(0, 10).map(row => [row[0], row[3]])
+            ]);
+            new google.visualization.BarChart(document.getElementById('top10_sales'))
+                .draw(top10Data, {title: 'Top 10 Juegos más Vendidos'});
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        header {
+            background-color: #003366;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .container {
+            width: 90%;
+            margin: 20px auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .authors {
+            text-align: center;
+            font-size: 16px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .chart-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+        }
+        .chart-box {
+            width: 48%;
+            background: #ffffff;
+            padding: 15px;
+            margin: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        h2 {
+            text-align: center;
+            color: #003366;
+        }
+    </style>
+</head>
+<body>
+    <header>Google Charts</header>
+    
+    <div class="container">
+        <div class="authors">
+            <p>Daniel Felipe Duarte Quintero</p>
+            <p>Mónica Antolínez Becerra</p>
+            <p>Harvey Demian Bastidas Caicedo</p>
+        </div>
+
+        <h2>Análisis de Ventas y Ratings de Juegos Android</h2>
+
+        <div class="chart-container">
+            <div class="chart-box">
+                <div id="top_user_ratings" style="width: 100%; height: 400px;"></div>
+            </div>
+            <div class="chart-box">
+                <div id="top_critic_ratings" style="width: 100%; height: 400px;"></div>
+            </div>
+            <div class="chart-box">
+                <div id="global_sales" style="width: 100%; height: 400px;"></div>
+            </div>
+            <div class="chart-box">
+                <div id="correlation_ratings_sales" style="width: 100%; height: 400px;"></div>
+            </div>
+            <div class="chart-box">
+                <div id="growth_comparison" style="width: 100%; height: 400px;"></div>
+            </div>
+            <div class="chart-box">
+                <div id="top10_sales" style="width: 100%; height: 400px;"></div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
